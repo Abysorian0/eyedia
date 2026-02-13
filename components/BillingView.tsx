@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Check, Zap, Shield, Crown, CreditCard, Loader2 } from 'lucide-react';
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { User, SubscriptionPlan } from '../types';
 
 interface BillingViewProps {
@@ -41,22 +42,23 @@ const PLANS = [
 const BillingView: React.FC<BillingViewProps> = ({ user, onUpdateSubscription }) => {
   const [loadingPlan, setLoadingPlan] = useState<SubscriptionPlan | null>(null);
 
-  const handleSubscribe = (plan: SubscriptionPlan) => {
-    if (plan === user.subscriptionPlan) return;
-    
-    setLoadingPlan(plan);
-    
-    // Simulation of PayPal Checkout Flow
-    // In a real app, you'd use @paypal/react-paypal-js and open the modal here
-    setTimeout(() => {
-      onUpdateSubscription(plan);
-      setLoadingPlan(null);
-      alert(`Success! You have been upgraded to the ${plan} plan via PayPal.`);
-    }, 2000);
+  const initialOptions = {
+      "clientId": import.meta.env.VITE_PAYPAL_CLIENT_ID || "test",
+      "enable-funding": "paylater,venmo",
+      "data-sdk-integration-source": "integrationbuilder_sc",
+      vault: true,
+      intent: "subscription",
+  };
+
+  const getPlanId = (planName: SubscriptionPlan) => {
+      if (planName === 'Pro') return import.meta.env.VITE_PAYPAL_PLAN_ID_PRO;
+      if (planName === 'Enterprise') return import.meta.env.VITE_PAYPAL_PLAN_ID_ENTERPRISE;
+      return null;
   };
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-5xl mx-auto">
+      <PayPalScriptProvider options={initialOptions}>
       <header className="text-center space-y-2">
         <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-cyan-400 to-violet-500 bg-clip-text text-transparent">
           Upgrade Your Flow
@@ -106,29 +108,44 @@ const BillingView: React.FC<BillingViewProps> = ({ user, onUpdateSubscription })
               ))}
             </ul>
 
-            <button 
-              onClick={() => handleSubscribe(plan.name)}
-              disabled={loadingPlan !== null || user.subscriptionPlan === plan.name}
-              className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                user.subscriptionPlan === plan.name 
-                ? 'bg-slate-800 text-slate-500 cursor-default' 
-                : plan.popular
-                  ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-500/20 active:scale-95'
-                  : 'bg-white text-slate-950 hover:bg-slate-200 active:scale-95'
-              }`}
-            >
-              {loadingPlan === plan.name ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>
-                  {user.subscriptionPlan === plan.name ? 'Current Plan' : (
-                    <>
-                      <CreditCard size={18} /> Pay with PayPal
-                    </>
-                  )}
-                </>
-              )}
-            </button>
+            {user.subscriptionPlan === plan.name ? (
+                <button 
+                  disabled
+                  className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-slate-800 text-slate-500 cursor-default"
+                >
+                  Current Plan
+                </button>
+            ) : plan.name !== 'Free' ? (
+                <div className="z-0 relative">
+                     <PayPalButtons
+                        style={{
+                            shape: "rect",
+                            layout: "vertical",
+                            color: "gold",
+                            label: "subscribe",
+                        }}
+                        createSubscription={(data, actions) => {
+                            const planId = getPlanId(plan.name);
+                            if (!planId) return Promise.reject(new Error("Invalid Plan ID"));
+                            return actions.subscription.create({
+                                plan_id: planId,
+                            });
+                        }}
+                        onApprove={async (data, actions) => {
+                            // Ideally, capture the subscription ID and store it
+                            onUpdateSubscription(plan.name);
+                            alert(`Success! You have been subscribed to ${plan.name}. Subscription ID: ${data.subscriptionID}`);
+                        }}
+                    />
+                </div>
+            ) : (
+                <button 
+                  disabled
+                  className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-white text-slate-950 hover:bg-slate-200 active:scale-95"
+                >
+                   Included
+                </button>
+            )}
           </div>
         ))}
       </div>
@@ -146,6 +163,7 @@ const BillingView: React.FC<BillingViewProps> = ({ user, onUpdateSubscription })
           <div className="text-[10px] font-black uppercase text-slate-600 tracking-widest">Global Encryption</div>
         </div>
       </div>
+      </PayPalScriptProvider>
     </div>
   );
 };
