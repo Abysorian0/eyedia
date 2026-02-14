@@ -3,6 +3,8 @@ export type Category = "Note" | "Task" | "Inspiration" | "Meeting" | "Project" |
 
 export type SubscriptionPlan = "Free" | "Pro" | "Enterprise";
 
+export type MobileLaunchStatus = "Not Started" | "Asset Preparation" | "Store Review" | "Live on Google Play" | "Live on App Store";
+
 export interface User {
   id: string;
   email: string;
@@ -15,6 +17,7 @@ export interface User {
   subscriptionActive: boolean;
   paypalSubscriptionId?: string;
   hasCompletedTour: boolean;
+  mobileLaunchStatus?: MobileLaunchStatus;
 }
 
 export interface CMSAnnouncement {
@@ -51,4 +54,4 @@ export interface Stats {
   today: number;
 }
 
-export type Tab = "capture" | "bank" | "search" | "stats" | "cms" | "users" | "settings" | "billing";
+export type Tab = "capture" | "bank" | "search" | "stats" | "cms" | "users" | "settings" | "billing" | "mobile-hub";

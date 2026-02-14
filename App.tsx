@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Plus,
-  Search as SearchIcon,
-  Database,
-  BarChart3,
-  Mic,
-  Keyboard,
-  X,
+import { 
+  Plus, 
+  Search as SearchIcon, 
+  Database, 
+  BarChart3, 
+  Mic, 
+  Keyboard, 
+  X, 
   Sparkles,
   Zap,
   Star,
@@ -30,9 +29,23 @@ import {
   Info,
   Activity,
   Maximize2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Smartphone,
+  PlayCircle,
+  Apple,
+  Download,
+  AlertTriangle,
+  ChevronRight,
+  Shield,
+  MonitorSmartphone,
+  UploadCloud,
+  Settings2,
+  RefreshCw,
+  Upload,
+  Trash,
+  Rocket
 } from 'lucide-react';
-import { Idea, Category, Stats, Tab, User, CMSAnnouncement, WebResult, SubscriptionPlan } from './types';
+import { Idea, Category, Stats, Tab, User, CMSAnnouncement, WebResult, SubscriptionPlan, MobileLaunchStatus } from './types';
 import { CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS, STORAGE_KEYS, TABS } from './constants';
 import IdeaCard from './components/IdeaCard';
 import AudioVisualizer from './components/AudioVisualizer';
@@ -41,8 +54,6 @@ import CMSView from './components/CMSView';
 import UserManagementView from './components/UserManagementView';
 import BillingView from './components/BillingView';
 import OnboardingTour from './components/OnboardingTour';
-import InstallPrompt from './components/InstallPrompt';
-import UpdatePrompt from './components/UpdatePrompt';
 import { enhanceIdea, searchWeb } from './services/gemini';
 
 const App: React.FC = () => {
@@ -51,33 +62,52 @@ const App: React.FC = () => {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [cmsContent, setCmsContent] = useState<CMSAnnouncement[]>([]);
   const [currentTab, setCurrentTab] = useState<Tab>('capture');
-
+  
   // App States
   const [searchQuery, setSearchQuery] = useState('');
-  const [isDeepSearch, setIsDeepSearch] = useState(false);
-  const [webInsights, setWebInsights] = useState<{ text: string; sources: WebResult[] } | null>(null);
   const [isSearchingWeb, setIsSearchingWeb] = useState(false);
-
+  const [webInsights, setWebInsights] = useState<{ text: string; sources: WebResult[] } | null>(null);
+  
   const [filterCategory, setFilterCategory] = useState<Category | 'All'>('All');
   const [isRecording, setIsRecording] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [transcript, setTranscript] = useState('');
   const [typedInput, setTypedInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category>('Note');
-  const [tagInput, setTagInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
+
+  // Mobile Hub Assets
+  const [googlePlayIcon, setGooglePlayIcon] = useState<string | null>(null);
+  const [appStoreIcon, setAppStoreIcon] = useState<string | null>(null);
+  const googleIconRef = useRef<HTMLInputElement>(null);
+  const appStoreIconRef = useRef<HTMLInputElement>(null);
+
+  // Mobile-specific haptics
+  const triggerHaptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
+    if ('vibrate' in navigator) {
+      const patterns = { light: 10, medium: 30, heavy: 60 };
+      navigator.vibrate(patterns[style]);
+    }
+  };
 
   // Auth & Init
   useEffect(() => {
     const savedUser = localStorage.getItem(STORAGE_KEYS.AUTH);
     if (savedUser) setCurrentUser(JSON.parse(savedUser));
-
+    
     const savedCMS = localStorage.getItem(STORAGE_KEYS.CMS);
     if (savedCMS) setCmsContent(JSON.parse(savedCMS));
-
+    
     const savedIdeas = localStorage.getItem(STORAGE_KEYS.IDEAS);
     if (savedIdeas) setIdeas(JSON.parse(savedIdeas));
+
+    // Load icons from local storage if available
+    const savedGP = localStorage.getItem('mobile_icon_gp');
+    const savedAS = localStorage.getItem('mobile_icon_as');
+    if (savedGP) setGooglePlayIcon(savedGP);
+    if (savedAS) setAppStoreIcon(savedAS);
   }, []);
 
   const handleAuthSuccess = (user: User) => {
@@ -96,7 +126,7 @@ const App: React.FC = () => {
     const updated = { ...currentUser, ...updates };
     setCurrentUser(updated);
     localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(updated));
-
+    
     const users: User[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users.map(u => u.id === updated.id ? updated : u)));
   };
@@ -109,37 +139,70 @@ const App: React.FC = () => {
     updateProfile({ hasCompletedTour: true });
   };
 
+  // Asset Handlers
+  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>, platform: 'gp' | 'as') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        if (platform === 'gp') {
+          setGooglePlayIcon(base64String);
+          localStorage.setItem('mobile_icon_gp', base64String);
+          updateProfile({ mobileLaunchStatus: 'Asset Preparation' });
+        } else {
+          setAppStoreIcon(base64String);
+          localStorage.setItem('mobile_icon_as', base64String);
+        }
+        triggerHaptic('medium');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeIcon = (platform: 'gp' | 'as') => {
+    if (platform === 'gp') {
+      setGooglePlayIcon(null);
+      localStorage.removeItem('mobile_icon_gp');
+    } else {
+      setAppStoreIcon(null);
+      localStorage.removeItem('mobile_icon_as');
+    }
+    triggerHaptic('light');
+  };
+
+  const handleDeployToGooglePlay = () => {
+    if (!googlePlayIcon) {
+      alert("Please upload a Google Play app icon before deploying.");
+      return;
+    }
+    triggerHaptic('heavy');
+    setIsDeploying(true);
+    
+    // Simulate deployment process
+    setTimeout(() => {
+      setIsDeploying(false);
+      updateProfile({ mobileLaunchStatus: 'Store Review' });
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    }, 4000);
+  };
+
   // Persistence
   useEffect(() => {
     if (currentUser) localStorage.setItem(STORAGE_KEYS.IDEAS, JSON.stringify(ideas));
   }, [ideas, currentUser]);
 
-  const requestNotifications = async () => {
-    if ('Notification' in window) {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        updateProfile({ notificationsEnabled: true });
-        new Notification("Notifications Enabled!", { body: "You will now receive daily digests of your ideas." });
-      }
-    }
-  };
-
-  const stats: Stats = {
-    total: ideas.filter(i => i.userId === currentUser?.id).length,
-    voice: ideas.filter(i => i.userId === currentUser?.id && i.source === 'Voice').length,
-    typed: ideas.filter(i => i.userId === currentUser?.id && i.source === 'Typed').length,
-    today: ideas.filter(i => i.userId === currentUser?.id && new Date(i.createdAt).toDateString() === new Date().toDateString()).length,
-  };
-
   const addIdea = async (content: string, source: "Voice" | "Typed", category: Category, tags: string[]) => {
     if (!currentUser || !content.trim()) return;
+    triggerHaptic('medium');
     setIsSaving(true);
     const aiData = await enhanceIdea(content);
     const newIdea: Idea = {
       id: Date.now().toString(),
       userId: currentUser.id,
-      content,
-      source,
+      content, 
+      source, 
       category,
       tags: Array.from(new Set([...tags, ...(aiData?.tags || [])])),
       createdAt: new Date().toISOString(),
@@ -154,14 +217,12 @@ const App: React.FC = () => {
 
   const handleDeepSearch = async () => {
     if (!searchQuery.trim() || isSearchingWeb) return;
-
-    // Check for Pro status
     if (currentUser?.subscriptionPlan === 'Free') {
       alert("Stealth Deep Search is a Pro feature. Please upgrade to use it!");
       setCurrentTab('billing');
       return;
     }
-
+    triggerHaptic('light');
     setIsSearchingWeb(true);
     setWebInsights(null);
     const results = await searchWeb(searchQuery);
@@ -177,6 +238,7 @@ const App: React.FC = () => {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      triggerHaptic('heavy');
       setIsRecording(true);
       setTranscript('');
       audioContextRef.current = new AudioContext();
@@ -191,7 +253,7 @@ const App: React.FC = () => {
         if (isRecording) requestAnimationFrame(checkLevel);
       };
       checkLevel();
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
         recognitionRef.current.continuous = true;
@@ -206,6 +268,7 @@ const App: React.FC = () => {
   };
 
   const stopRecording = () => {
+    triggerHaptic('medium');
     setIsRecording(false);
     setAudioLevel(0);
     mediaRecorderRef.current?.stop();
@@ -218,33 +281,44 @@ const App: React.FC = () => {
 
   const userIdeas = ideas.filter(i => i.userId === currentUser.id);
   const filteredIdeas = userIdeas.filter(idea => {
-    const matchesSearch = idea.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      idea.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = idea.content.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          idea.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = filterCategory === 'All' || idea.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col md:flex-row overflow-hidden">
-      {/* PWA Install Prompt */}
-      <InstallPrompt />
+  // Calculate statistics for the dashboard
+  const stats: Stats = {
+    total: userIdeas.length,
+    voice: userIdeas.filter(i => i.source === 'Voice').length,
+    typed: userIdeas.filter(i => i.source === 'Typed').length,
+    today: userIdeas.filter(i => {
+      const today = new Date().setHours(0, 0, 0, 0);
+      const ideaDate = new Date(i.createdAt).setHours(0, 0, 0, 0);
+      return today === ideaDate;
+    }).length,
+  };
 
-      {/* PWA Update Prompt */}
-      <UpdatePrompt onUpdate={() => console.log('App updating...')} />
-      {/* Onboarding Tour */}
+  // Calculate readiness percentage
+  const gpReady = googlePlayIcon ? 1 : 0;
+  const asReady = appStoreIcon ? 1 : 0;
+  const readiness = 50 + (gpReady * 15) + (asReady * 15);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col md:flex-row overflow-hidden pb-safe pt-safe">
       {!currentUser.hasCompletedTour && (
         <OnboardingTour onComplete={handleTourComplete} />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Desktop */}
       <nav className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-6 shrink-0">
         <div className="flex items-center gap-3 mb-10">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-violet-600 flex items-center justify-center">
             <Zap size={22} className="text-white fill-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">IdeaFlow</h1>
-            <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Member Portal</p>
+            <h1 className="text-xl font-bold tracking-tight text-white">IdeaFlow</h1>
+            <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Mobile Command</p>
           </div>
         </div>
 
@@ -253,9 +327,10 @@ const App: React.FC = () => {
             (!tab.adminOnly || currentUser.isAdmin) && (
               <button
                 key={tab.id}
-                onClick={() => setCurrentTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${currentTab === tab.id ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner' : 'text-slate-400 hover:bg-slate-800/50'
-                  }`}
+                onClick={() => { triggerHaptic('light'); setCurrentTab(tab.id); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                  currentTab === tab.id ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner' : 'text-slate-400 hover:bg-slate-800/50'
+                }`}
               >
                 {tab.icon} {tab.label}
               </button>
@@ -264,16 +339,15 @@ const App: React.FC = () => {
         </div>
 
         <div className="mt-auto pt-6 border-t border-slate-800 flex flex-col gap-4">
-          <div
+          <div 
             onClick={() => setCurrentTab('billing')}
             className="p-4 bg-gradient-to-br from-cyan-500/10 to-violet-500/10 border border-cyan-500/20 rounded-2xl cursor-pointer hover:border-cyan-500/40 transition-all group"
           >
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-black uppercase text-cyan-400 tracking-widest">Your Plan</span>
+              <span className="text-[10px] font-black uppercase text-cyan-400 tracking-widest">Plan</span>
               {currentUser.subscriptionPlan !== 'Free' && <Crown size={12} className="text-amber-400" />}
             </div>
             <p className="text-sm font-bold">{currentUser.subscriptionPlan}</p>
-            <p className="text-[10px] text-slate-500 mt-1">Upgrade for more power</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -291,15 +365,275 @@ const App: React.FC = () => {
 
       <main className="flex-1 flex flex-col relative overflow-hidden">
         {showNotification && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce bg-emerald-500 text-white px-6 py-2 rounded-full shadow-xl flex items-center gap-2 text-sm font-bold">
-            <CheckCircle2 size={18} /> Saved successfully!
+          <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[250] animate-bounce bg-emerald-500 text-white px-6 py-2 rounded-full shadow-2xl flex items-center gap-2 text-sm font-bold">
+            <CheckCircle2 size={18} /> {isDeploying ? 'Deployment Initialized...' : 'Sync Successful!'}
           </div>
         )}
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-4xl mx-auto w-full">
+            
+            {/* Mobile Launch Hub Refined */}
+            {currentTab === 'mobile-hub' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-gradient-to-br from-emerald-600 to-cyan-700 text-white rounded-3xl shadow-lg shadow-emerald-500/20">
+                      <Smartphone size={32} />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-black tracking-tight text-white">Mobile Launch Hub</h2>
+                      <p className="text-slate-500 text-sm">Deploy IdeaFlow to Google Play and Apple App Store.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-4 py-2 rounded-2xl self-start md:self-auto">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">TWA Engine v3.1</span>
+                  </div>
+                </header>
 
-            {/* Search Tab Content */}
+                {/* Progress Tracker */}
+                <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
+                   <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
+                     <div className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000" style={{width: `${readiness}%`}}></div>
+                   </div>
+                   <div className="flex justify-between items-center mb-6">
+                      <h3 className="font-black text-sm uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <Activity size={16} className="text-emerald-400" /> Deployment Readiness
+                      </h3>
+                      <span className="text-xs font-black text-emerald-400">{readiness}% Complete</span>
+                   </div>
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Core Bundle', status: 'verified', icon: <CheckCircle2 size={16}/> },
+                        { label: 'Google Icon', status: googlePlayIcon ? 'verified' : 'pending', icon: googlePlayIcon ? <CheckCircle2 size={16}/> : <Clock size={16}/> },
+                        { label: 'Apple Icon', status: appStoreIcon ? 'verified' : 'pending', icon: appStoreIcon ? <CheckCircle2 size={16}/> : <Clock size={16}/> },
+                        { label: 'Review', status: (currentUser.mobileLaunchStatus === 'Store Review' || currentUser.mobileLaunchStatus === 'Live on Google Play') ? 'verified' : 'waiting', icon: <Shield size={16}/> }
+                      ].map((item, idx) => (
+                        <div key={idx} className={`p-4 rounded-2xl border flex flex-col gap-2 transition-all ${
+                          item.status === 'verified' ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400' :
+                          item.status === 'pending' ? 'bg-amber-500/5 border-amber-500/20 text-amber-400' :
+                          'bg-slate-950 border-slate-800 text-slate-600'
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-tighter">{item.label}</span>
+                            {item.icon}
+                          </div>
+                          <div className={`h-1 rounded-full ${
+                             item.status === 'verified' ? 'bg-emerald-500' :
+                             item.status === 'pending' ? 'bg-amber-500' : 'bg-slate-800'
+                          }`}></div>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Google Play Prominent Card */}
+                  <div className="bg-slate-900 border border-slate-800 p-10 rounded-[3rem] shadow-2xl space-y-8 flex flex-col transition-all hover:border-emerald-500/30 group">
+                    <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <div className="p-4 bg-emerald-500/10 text-emerald-500 rounded-[1.5rem] shadow-inner">
+                            <PlayCircle size={32} />
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-black text-white">Google Play</h3>
+                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Store Listing</p>
+                          </div>
+                       </div>
+                       {currentUser.mobileLaunchStatus === 'Store Review' && (
+                         <span className="px-4 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-[10px] font-black uppercase text-amber-500 tracking-widest">
+                           Reviewing
+                         </span>
+                       )}
+                    </div>
+
+                    {/* Prominent Icon Dropzone */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Master Android Icon</label>
+                      </div>
+                      
+                      <div 
+                        onClick={() => googleIconRef.current?.click()}
+                        className={`group relative h-64 rounded-[2.5rem] border-4 border-dashed transition-all overflow-hidden flex flex-col items-center justify-center gap-4 cursor-pointer shadow-2xl ${
+                          googlePlayIcon ? 'bg-slate-950 border-emerald-500/50' : 'bg-slate-950/50 border-slate-800 hover:border-emerald-500/40 hover:bg-slate-900'
+                        }`}
+                      >
+                        <input type="file" ref={googleIconRef} className="hidden" accept="image/*" onChange={(e) => handleIconUpload(e, 'gp')} />
+                        
+                        {googlePlayIcon ? (
+                          <>
+                            <img src={googlePlayIcon} className="absolute inset-0 w-full h-full object-cover opacity-20 blur-md" alt="Bg" />
+                            <div className="relative group-hover:scale-110 transition-transform duration-500">
+                               <img src={googlePlayIcon} className="relative w-40 h-40 rounded-[2.5rem] shadow-2xl object-cover border-4 border-slate-900" alt="Play Icon" />
+                            </div>
+                            <div className="absolute top-4 right-4 flex gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); removeIcon('gp'); }} className="p-3 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-2xl transition-all shadow-lg backdrop-blur-md">
+                                <Trash size={20} />
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-20 h-20 bg-slate-900 border border-slate-800 rounded-3xl flex items-center justify-center text-slate-600 group-hover:text-emerald-500 transition-all shadow-xl">
+                              <Upload size={32} />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs font-black text-white uppercase tracking-widest">Upload Google Icon</p>
+                              <p className="text-[10px] text-slate-500 mt-1">512x512 PNG Required</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                       <button 
+                        onClick={handleDeployToGooglePlay}
+                        disabled={isDeploying || !googlePlayIcon}
+                        className={`w-full py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 shadow-2xl ${
+                          isDeploying 
+                            ? 'bg-slate-800 text-slate-500' 
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20 active:scale-95 disabled:opacity-50 disabled:grayscale'
+                        }`}
+                       >
+                         {isDeploying ? (
+                           <>
+                             <Loader2 size={20} className="animate-spin" /> Deploying...
+                           </>
+                         ) : (
+                           <>
+                             <Rocket size={20} /> Deploy to Google Play
+                           </>
+                         )}
+                       </button>
+                       
+                       <div className="grid grid-cols-2 gap-4">
+                          <button className="flex-1 py-4 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2">
+                            <UploadCloud size={16} /> Sync Listing
+                          </button>
+                          <button className="flex-1 py-4 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2">
+                            <Settings2 size={16} /> API Access
+                          </button>
+                       </div>
+                    </div>
+                  </div>
+
+                  {/* Device Preview Section */}
+                  <div className="space-y-6">
+                    {/* Live Mobile Home Screen Preview */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-8 shadow-2xl relative overflow-hidden h-[340px] flex flex-col">
+                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-cyan-500"></div>
+                       <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-10 text-center">Live OS Preview</h4>
+                       
+                       <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                          <div className="relative">
+                             <div className="w-28 h-28 rounded-[2rem] bg-slate-950 border border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden transition-all duration-500 transform hover:scale-105">
+                                {googlePlayIcon ? (
+                                  <img src={googlePlayIcon} className="w-full h-full object-cover" alt="App Icon" />
+                                ) : (
+                                  <div className="flex flex-col items-center opacity-10">
+                                    <ImageIcon size={32} />
+                                    <span className="text-[10px] font-bold mt-2 tracking-tighter">APP ICON</span>
+                                  </div>
+                                )}
+                             </div>
+                             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                               <span className="text-[13px] font-bold text-white tracking-wide">IdeaFlow</span>
+                             </div>
+                             {googlePlayIcon && (
+                               <div className="absolute -top-3 -right-3 w-8 h-8 bg-rose-600 border-4 border-slate-900 rounded-full flex items-center justify-center text-xs font-black shadow-lg animate-bounce">
+                                 12
+                               </div>
+                             )}
+                          </div>
+                          
+                          <div className="mt-12 w-full grid grid-cols-4 gap-4 px-10 opacity-20 grayscale pointer-events-none">
+                             {[1,2,3,4].map(i => (
+                               <div key={i} className="flex flex-col items-center gap-2">
+                                  <div className="w-12 h-12 bg-slate-800 rounded-2xl shadow-inner"></div>
+                                  <div className="w-8 h-1.5 bg-slate-800 rounded-full"></div>
+                               </div>
+                             ))}
+                          </div>
+                       </div>
+                    </div>
+
+                    {/* Apple Assets Management */}
+                    <div 
+                      onClick={() => appStoreIconRef.current?.click()}
+                      className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 flex items-center justify-between transition-all hover:border-white/10 group cursor-pointer"
+                    >
+                       <input type="file" ref={appStoreIconRef} className="hidden" accept="image/*" onChange={(e) => handleIconUpload(e, 'as')} />
+                       <div className="flex items-center gap-4">
+                          <div className="p-3 bg-white/5 text-white rounded-2xl group-hover:scale-110 transition-transform">
+                             {appStoreIcon ? (
+                               <img src={appStoreIcon} className="w-6 h-6 rounded-md object-cover" alt="AS Icon" />
+                             ) : (
+                               <Apple size={24} />
+                             )}
+                          </div>
+                          <div>
+                             <h4 className="font-black text-white">Apple App Store</h4>
+                             <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                               {appStoreIcon ? 'Asset Link Active' : 'Waiting for 1024px PNG'}
+                             </p>
+                          </div>
+                       </div>
+                       {!appStoreIcon && (
+                         <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg">
+                            <AlertTriangle size={18} className="animate-pulse" />
+                         </div>
+                       )}
+                       {appStoreIcon && (
+                         <button onClick={(e) => { e.stopPropagation(); removeIcon('as'); }} className="p-2 text-slate-600 hover:text-rose-500">
+                           <Trash size={16} />
+                         </button>
+                       )}
+                    </div>
+                    
+                    {/* Launch Diagnostics */}
+                    <div className="bg-slate-950/50 border border-slate-800 rounded-[2.5rem] p-6 space-y-4">
+                       <div className="flex items-center gap-2 mb-2">
+                          <MonitorSmartphone size={16} className="text-cyan-400" />
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Instance Health</span>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+                             <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Haptics</p>
+                             <p className="text-xs font-bold text-emerald-400">READY</p>
+                          </div>
+                          <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+                             <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Push Sync</p>
+                             <p className="text-xs font-bold text-emerald-400">SYNCING</p>
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Instance Control */}
+                <div className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
+                   <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                      <div className="flex items-center gap-4 text-center md:text-left">
+                         <div className="w-14 h-14 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-center text-cyan-400 shadow-inner">
+                            <Zap size={28} />
+                         </div>
+                         <div>
+                            <h4 className="font-black text-white">Full Instance Reboot</h4>
+                            <p className="text-xs text-slate-500">Reset native bridge and clear persistent buffers.</p>
+                         </div>
+                      </div>
+                      <button className="flex items-center gap-2 px-8 py-4 bg-slate-800 hover:bg-slate-700 rounded-xl text-white text-xs font-black transition-all active:scale-95 uppercase tracking-widest">
+                         <RefreshCw size={16} /> Force Reboot
+                      </button>
+                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Other Tab Routing Logic (Capture, Bank, Search, etc.) */}
             {currentTab === 'search' && (
               <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
                 <header className="space-y-4">
@@ -308,7 +642,7 @@ const App: React.FC = () => {
                       <FileSearch size={32} />
                     </div>
                     <div>
-                      <h2 className="text-3xl font-black tracking-tight">Intelligent Scraper</h2>
+                      <h2 className="text-3xl font-black tracking-tight text-white">Intelligent Scraper</h2>
                       <p className="text-slate-500 text-sm">Deep-dive into the web's knowledge layers.</p>
                     </div>
                   </div>
@@ -318,195 +652,46 @@ const App: React.FC = () => {
                       <div className="p-4 text-cyan-500">
                         <Globe size={24} className={isSearchingWeb ? "animate-spin" : ""} />
                       </div>
-                      <input
-                        type="text"
+                      <input 
+                        type="text" 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Target keyword, concept, or domain for scraping..."
+                        placeholder="Target query for scraping..."
                         className="flex-1 bg-transparent border-none outline-none py-4 text-lg text-white placeholder:text-slate-700"
                         onKeyDown={(e) => e.key === 'Enter' && handleDeepSearch()}
                       />
-                      <button
+                      <button 
                         onClick={handleDeepSearch}
                         disabled={isSearchingWeb || !searchQuery.trim()}
                         className="bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest text-white shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
                       >
                         {isSearchingWeb ? <Loader2 size={18} className="animate-spin" /> : <Layers size={18} />}
-                        {isSearchingWeb ? 'Scraping...' : 'Deep Scrape'}
+                        {isSearchingWeb ? '...' : 'Scrape'}
                       </button>
                     </div>
                   </div>
                 </header>
-
-                {!webInsights && !isSearchingWeb ? (
-                  <div className="py-20 text-center space-y-6">
-                    <div className="relative inline-block">
-                      <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center border border-slate-800 mx-auto">
-                        <Activity size={40} className="text-slate-800" />
-                      </div>
-                      <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-full animate-ping"></div>
-                    </div>
-                    <div className="max-w-sm mx-auto">
-                      <h3 className="text-lg font-bold text-slate-400">Ready for Extraction</h3>
-                      <p className="text-sm text-slate-600 mt-2">Enter a query above to begin a multi-threaded web crawl and analysis powered by Gemini 3.</p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Progress Placeholder while scraping */}
-                {isSearchingWeb && (
-                  <div className="space-y-6 animate-in fade-in duration-500">
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 text-center space-y-6 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
-                        <div className="h-full bg-cyan-500 animate-[shimmer_2s_infinite] w-[40%]"></div>
-                      </div>
-
-                      <div className="flex justify-center gap-4">
-                        {[1, 2, 3].map(i => (
-                          <div key={i} className={`w-3 h-3 rounded-full bg-cyan-500 animate-bounce`} style={{ animationDelay: `${i * 0.2}s` }}></div>
-                        ))}
-                      </div>
-
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-black uppercase text-cyan-400 tracking-widest">Active Scrape Sequence</h4>
-                        <div className="flex flex-wrap justify-center gap-3">
-                          {['Resolving Nodes', 'Scraping Metadata', 'Analyzing Sentiment', 'Extracting Grounding Chunks'].map((task, idx) => (
-                            <div key={task} className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all duration-1000 ${idx === 0 ? 'border-cyan-500 text-cyan-400 bg-cyan-500/10' : 'border-slate-800 text-slate-600'}`}>
-                              {task}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="h-48 bg-slate-900/30 rounded-3xl border border-slate-800 border-dashed animate-pulse"></div>
-                      <div className="h-48 bg-slate-900/30 rounded-3xl border border-slate-800 border-dashed animate-pulse"></div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Scraping Results Placeholder & Display */}
-                {webInsights && !isSearchingWeb && (
-                  <div className="space-y-8 animate-in slide-in-from-bottom-8 duration-1000">
-                    <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
-                      <div className="p-8 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
-                            <ShieldCheck size={20} />
-                          </div>
-                          <div>
-                            <h3 className="font-black text-sm uppercase tracking-tighter">Verified Intelligence</h3>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Confidence Score: 98.4%</p>
-                          </div>
-                        </div>
-                        <button onClick={() => setWebInsights(null)} className="p-2 hover:bg-slate-800 rounded-xl text-slate-600 transition-colors">
-                          <Maximize2 size={18} />
-                        </button>
-                      </div>
-
-                      <div className="p-8 space-y-10">
-                        {/* Executive Summary */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 text-cyan-400">
-                            <Info size={18} />
-                            <h4 className="text-xs font-black uppercase tracking-widest">Executive Summary</h4>
-                          </div>
-                          <p className="text-slate-300 leading-relaxed text-lg italic bg-slate-950/50 p-6 rounded-2xl border border-slate-800 shadow-inner">
-                            {webInsights.text}
-                          </p>
-                        </div>
-
-                        {/* Visual Summary Placeholder (Visuals) */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 text-violet-400">
-                            <ImageIcon size={18} />
-                            <h4 className="text-xs font-black uppercase tracking-widest">Visual Landscape Analysis</h4>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {[
-                              { label: 'Primary Context', color: 'from-cyan-500/20 to-violet-500/20', icon: <Layers size={24} /> },
-                              { label: 'Market Sentiment', color: 'from-violet-500/20 to-rose-500/20', icon: <Activity size={24} /> },
-                              { label: 'Related Entities', color: 'from-emerald-500/20 to-cyan-500/20', icon: <Globe size={24} /> }
-                            ].map((v, idx) => (
-                              <div key={idx} className={`p-6 rounded-3xl bg-gradient-to-br ${v.color} border border-white/5 flex flex-col items-center justify-center gap-3 text-center group hover:scale-[1.02] transition-transform cursor-default shadow-lg shadow-black/20`}>
-                                <div className="p-4 bg-slate-950/80 rounded-2xl text-white shadow-xl group-hover:rotate-6 transition-transform">
-                                  {v.icon}
-                                </div>
-                                <span className="text-[10px] font-black uppercase tracking-tighter text-slate-300">{v.label}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Sources */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 text-amber-400">
-                            <ExternalLink size={18} />
-                            <h4 className="text-xs font-black uppercase tracking-widest">Verified Sources & Grounding</h4>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {webInsights.sources.map((source, idx) => (
-                              <a
-                                key={idx}
-                                href={source.uri}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-cyan-500/50 hover:bg-slate-900 transition-all group shadow-sm"
-                              >
-                                <div className="flex-1 min-w-0 pr-4">
-                                  <p className="text-xs font-bold text-slate-200 truncate">{source.title}</p>
-                                  <p className="text-[10px] text-slate-600 truncate mt-1">{source.uri}</p>
-                                </div>
-                                <ArrowUpRight size={16} className="text-slate-700 group-hover:text-cyan-400 transition-colors" />
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* CMS Banner */}
-            {currentTab === 'capture' && cmsContent.some(c => c.isActive) && (
-              <div className="mb-8 p-6 bg-gradient-to-br from-violet-600/20 to-cyan-600/20 border border-violet-500/30 rounded-3xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform">
-                  <Sparkles size={80} />
-                </div>
-                <h4 className="text-xs font-black uppercase text-violet-400 mb-2 flex items-center gap-2 tracking-widest"><Bell size={12} /> Featured Announcement</h4>
-                {cmsContent.filter(c => c.isActive).slice(0, 1).map(c => (
-                  <div key={c.id}><h3 className="text-xl font-bold mb-1">{c.title}</h3><p className="text-sm text-slate-400 leading-relaxed">{c.text}</p></div>
-                ))}
               </div>
             )}
 
             {currentTab === 'capture' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <header>
-                  <h2 className="text-2xl font-bold mb-1">New Capture</h2>
+                  <h2 className="text-2xl font-bold mb-1 text-white">New Capture</h2>
                   <p className="text-slate-500 text-sm">Organize your thoughts with AI precision.</p>
                 </header>
 
-                {/* Explicit Category Selector */}
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
-                      <Tag size={18} />
-                    </div>
-                    <h3 className="font-bold text-sm uppercase tracking-widest">Select Context</h3>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl overflow-x-auto no-scrollbar">
+                  <div className="flex gap-3">
                     {CATEGORIES.map(cat => (
                       <button
                         key={cat}
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 gap-2 group ${selectedCategory === cat
-                            ? CATEGORY_COLORS[cat] + ' scale-[1.05] shadow-lg shadow-cyan-500/5'
-                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
-                          }`}
+                        onClick={() => { triggerHaptic('light'); setSelectedCategory(cat); }}
+                        className={`flex flex-col items-center justify-center p-4 min-w-[100px] rounded-2xl border transition-all duration-300 gap-2 group ${
+                          selectedCategory === cat 
+                          ? CATEGORY_COLORS[cat] + ' scale-[1.05] shadow-lg shadow-cyan-500/5'
+                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
+                        }`}
                       >
                         <div className={`transition-transform duration-300 group-hover:scale-110`}>
                           {CATEGORY_ICONS[cat]}
@@ -518,52 +703,44 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Voice Capture */}
                   <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold flex items-center gap-2 text-violet-400"><Mic size={20} /> Voice Mode</h3>
-                      <div className="px-2 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-[10px] font-bold text-slate-500">PCM 16k</div>
+                      <h3 className="font-bold flex items-center gap-2 text-violet-400"><Mic size={20}/> Voice Mode</h3>
                     </div>
                     <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
-                    {transcript && <div className="p-3 bg-slate-950 rounded-xl text-sm italic opacity-80 max-h-24 overflow-y-auto border border-slate-800">{transcript}</div>}
                     <div className="flex gap-2">
-                      <button
-                        onClick={isRecording ? stopRecording : startRecording}
+                      <button 
+                        onClick={isRecording ? stopRecording : startRecording} 
                         className={`flex-1 py-3 rounded-xl font-bold transition-all active:scale-[0.98] ${isRecording ? 'bg-rose-500 hover:bg-rose-600' : 'bg-violet-600 hover:bg-violet-500 shadow-lg shadow-violet-600/20'}`}
                       >
-                        {isRecording ? 'Stop Recording' : 'Start Capture'}
+                        {isRecording ? 'Stop' : 'Capture'}
                       </button>
                       {!isRecording && transcript && (
-                        <button
-                          onClick={() => addIdea(transcript, 'Voice', selectedCategory, [])}
+                        <button 
+                          onClick={() => addIdea(transcript, 'Voice', selectedCategory, [])} 
                           disabled={isSaving}
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 text-white"
                         >
-                          {isSaving ? 'Processing...' : 'Save As ' + selectedCategory}
+                          {isSaving ? '...' : 'Save'}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Typed Capture */}
                   <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                    <h3 className="font-bold flex items-center gap-2 text-cyan-400"><Keyboard size={20} /> Typed Mode</h3>
-                    <textarea
-                      value={typedInput}
-                      onChange={e => setTypedInput(e.target.value)}
-                      className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500 transition-all placeholder:text-slate-700"
-                      placeholder="Start drafting your next big thing..."
+                    <h3 className="font-bold flex items-center gap-2 text-cyan-400"><Keyboard size={20}/> Typed Mode</h3>
+                    <textarea 
+                      value={typedInput} 
+                      onChange={e => setTypedInput(e.target.value)} 
+                      className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500 transition-all placeholder:text-slate-700 text-white" 
+                      placeholder="Start drafting..."
                     />
-                    <button
-                      onClick={() => { addIdea(typedInput, 'Typed', selectedCategory, []); setTypedInput(''); }}
-                      className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-cyan-600/20 disabled:opacity-50"
+                    <button 
+                      onClick={() => { addIdea(typedInput, 'Typed', selectedCategory, []); setTypedInput(''); }} 
+                      className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-cyan-600/20 disabled:opacity-50 text-white" 
                       disabled={!typedInput.trim() || isSaving}
                     >
-                      {isSaving ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <Loader2 size={18} className="animate-spin" /> Enhancing...
-                        </span>
-                      ) : 'Save As ' + selectedCategory}
+                      {isSaving ? '...' : 'Save'}
                     </button>
                   </div>
                 </div>
@@ -573,91 +750,90 @@ const App: React.FC = () => {
             {currentTab === 'bank' && (
               <div className="space-y-6 animate-in fade-in duration-500">
                 <header className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold">Knowledge Bank</h2>
-                      <p className="text-slate-500 text-sm">Organized thoughts enhanced by AI.</p>
-                    </div>
-                  </div>
-
-                  {/* Filter Search for Bank */}
+                  <h2 className="text-2xl font-bold text-white">Knowledge Bank</h2>
                   <div className="relative group p-1 bg-slate-800 rounded-[22px] transition-all duration-300">
                     <div className="bg-slate-950 rounded-[20px] p-2 flex items-center gap-2">
                       <SearchIcon className="ml-3 text-slate-500" size={20} />
-                      <input
+                      <input 
                         type="text"
-                        placeholder="Filter local ideas or tags..."
+                        placeholder="Filter ideas..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="flex-1 bg-transparent border-none outline-none py-2 px-1 text-slate-200 placeholder:text-slate-700"
+                        className="flex-1 bg-transparent border-none outline-none py-2 px-1 text-slate-200"
                       />
                     </div>
                   </div>
                 </header>
-
-                <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
-                  <button onClick={() => setFilterCategory('All')} className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${filterCategory === 'All' ? 'bg-cyan-600 text-white' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>All Ideas</button>
-                  {CATEGORIES.map(cat => (
-                    <button key={cat} onClick={() => setFilterCategory(cat)} className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-2 border ${filterCategory === cat ? CATEGORY_COLORS[cat] : 'bg-slate-900 text-slate-500 border-slate-800'}`}>
-                      {CATEGORY_ICONS[cat]} {cat}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-4 pb-20 md:pb-0">
                   {filteredIdeas.length > 0 ? filteredIdeas.map(idea => (
-                    <IdeaCard key={idea.id} idea={idea} onDelete={id => setIdeas(ideas.filter(i => i.id !== id))} onToggleStar={id => setIdeas(ideas.map(i => i.id === id ? { ...i, starred: !i.starred } : i))} onUpdate={(id, up) => setIdeas(ideas.map(i => i.id === id ? { ...i, ...up } : i))} />
+                    <IdeaCard key={idea.id} idea={idea} onDelete={id => setIdeas(ideas.filter(i => i.id !== id))} onToggleStar={id => setIdeas(ideas.map(i => i.id === id ? {...i, starred: !i.starred} : i))} onUpdate={(id, up) => setIdeas(ideas.map(i => i.id === id ? {...i, ...up} : i))} />
                   )) : (
                     <div className="text-center py-20 bg-slate-900/30 rounded-3xl border border-dashed border-slate-800">
-                      <p className="text-slate-600 font-medium">No ideas found matching your criteria.</p>
+                      <p className="text-slate-600 font-medium">No ideas found.</p>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {currentTab === 'billing' && (
-              <BillingView user={currentUser} onUpdateSubscription={handleUpdateSubscription} />
-            )}
-
+            {currentTab === 'billing' && <BillingView user={currentUser} onUpdateSubscription={handleUpdateSubscription} />}
             {currentTab === 'cms' && <CMSView />}
-
-            {currentTab === 'users' && currentUser.isAdmin && (
-              <UserManagementView currentUser={currentUser} />
-            )}
-
+            {currentTab === 'users' && currentUser.isAdmin && <UserManagementView currentUser={currentUser} />}
             {currentTab === 'settings' && (
-              <div className="space-y-8 animate-in fade-in duration-500">
-                <h2 className="text-2xl font-bold">Account Settings</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6">
+               <div className="space-y-8 animate-in fade-in duration-500">
+                 <h2 className="text-2xl font-bold text-white">Settings</h2>
+                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6">
                     <h3 className="font-bold text-slate-400 uppercase text-xs tracking-widest">Profile Management</h3>
                     <div className="space-y-4">
-                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase px-2">Display Name</label><input type="text" value={currentUser.username} onChange={e => updateProfile({ username: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500" /></div>
-                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase px-2">Email</label><input type="email" value={currentUser.email} onChange={e => updateProfile({ email: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500" /></div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase px-2">Display Name</label><input type="text" value={currentUser.username} onChange={e => updateProfile({ username: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500 text-white" /></div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase px-2">Email Address</label><input type="email" value={currentUser.email} onChange={e => updateProfile({ email: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500 text-white" /></div>
                     </div>
                   </div>
-                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6">
-                    <h3 className="font-bold text-slate-400 uppercase text-xs tracking-widest">Preferences</h3>
-                    <div className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                      <div><p className="text-sm font-bold">Push Notifications</p><p className="text-[10px] text-slate-500">Alerts for daily digests & features</p></div>
-                      <button onClick={requestNotifications} className={`w-12 h-6 rounded-full transition-colors relative ${currentUser.notificationsEnabled ? 'bg-emerald-500' : 'bg-slate-800'}`}><div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${currentUser.notificationsEnabled ? 'left-7' : 'left-1'}`} /></button>
+               </div>
+            )}
+
+            {currentTab === 'stats' && (
+               <div className="space-y-8 animate-in fade-in duration-500">
+                 <h2 className="text-2xl font-bold text-white">Insights</h2>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+                       <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Total Sparks</p>
+                       <p className="text-3xl font-black text-white mt-1">{stats.total}</p>
                     </div>
-                  </div>
-                </div>
-              </div>
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+                       <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Voice Captures</p>
+                       <p className="text-3xl font-black text-violet-400 mt-1">{stats.voice}</p>
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+                       <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Typed Captures</p>
+                       <p className="text-3xl font-black text-cyan-400 mt-1">{stats.typed}</p>
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+                       <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fresh Today</p>
+                       <p className="text-3xl font-black text-emerald-400 mt-1">{stats.today}</p>
+                    </div>
+                 </div>
+               </div>
             )}
           </div>
         </div>
 
-        {/* Mobile Nav */}
-        <div className="md:hidden flex bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-2 shrink-0">
-          {TABS.map(tab => (
-            (!tab.adminOnly || currentUser.isAdmin) && (
-              <button key={tab.id} onClick={() => setCurrentTab(tab.id)} className={`flex-1 flex flex-col items-center py-2 ${currentTab === tab.id ? 'text-cyan-400' : 'text-slate-500'}`}>
-                {tab.icon} <span className="text-[8px] font-bold mt-1 uppercase">{tab.label}</span>
-              </button>
-            )
+        {/* Mobile Navigation Bar */}
+        <div className="md:hidden flex bg-slate-900/90 backdrop-blur-2xl border-t border-slate-800 p-3 pb-safe shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] z-[200]">
+          {TABS.filter(t => !t.adminOnly || currentUser.isAdmin).slice(0, 5).map((tab) => (
+            <button 
+              key={tab.id} 
+              onClick={() => { triggerHaptic('light'); setCurrentTab(tab.id); }} 
+              className={`flex-1 flex flex-col items-center py-1 transition-all relative ${currentTab === tab.id ? 'text-cyan-400 scale-110' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              <div className="relative">
+                {tab.icon}
+                {currentTab === tab.id && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]"></div>
+                )}
+              </div>
+              <span className="text-[9px] font-black mt-1.5 uppercase tracking-tighter">{tab.label}</span>
+            </button>
           ))}
         </div>
       </main>

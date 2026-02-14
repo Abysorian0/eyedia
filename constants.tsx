@@ -16,7 +16,8 @@ import {
   CreditCard,
   Mic,
   Keyboard,
-  UserCog
+  UserCog,
+  Smartphone
 } from 'lucide-react';
 import { Category, Tab } from './types';
 
@@ -29,7 +30,6 @@ export const CATEGORY_COLORS: Record<string, string> = {
   Meeting: "border-violet-500 text-violet-400 bg-violet-500/10",
   Project: "border-cyan-500 text-cyan-400 bg-cyan-500/10",
   Question: "border-rose-500 text-rose-400 bg-rose-500/10",
-  // Fallbacks for sources if needed
   Voice: "border-violet-500 text-violet-400 bg-violet-500/10",
   Typed: "border-cyan-500 text-cyan-400 bg-cyan-500/10",
 };
@@ -49,6 +49,7 @@ export const TABS: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: 
   { id: 'capture', label: 'Capture', icon: <PlusCircle size={20} /> },
   { id: 'bank', label: 'Bank', icon: <Database size={20} /> },
   { id: 'search', label: 'Search', icon: <Search size={20} /> },
+  { id: 'mobile-hub', label: 'Mobile Hub', icon: <Smartphone size={20} /> },
   { id: 'stats', label: 'Stats', icon: <BarChart3 size={20} /> },
   { id: 'cms', label: 'CMS', icon: <ShieldAlert size={20} />, adminOnly: true },
   { id: 'users', label: 'Users', icon: <UserCog size={20} />, adminOnly: true },
