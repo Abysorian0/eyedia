@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Plus, 
-  Search as SearchIcon, 
-  Database, 
-  BarChart3, 
-  Mic, 
-  Keyboard, 
-  X, 
+import {
+  Plus,
+  Search as SearchIcon,
+  Database,
+  BarChart3,
+  Mic,
+  Keyboard,
+  X,
   Sparkles,
   Zap,
   Star,
@@ -41,6 +41,8 @@ import CMSView from './components/CMSView';
 import UserManagementView from './components/UserManagementView';
 import BillingView from './components/BillingView';
 import OnboardingTour from './components/OnboardingTour';
+import InstallPrompt from './components/InstallPrompt';
+import UpdatePrompt from './components/UpdatePrompt';
 import { enhanceIdea, searchWeb } from './services/gemini';
 
 const App: React.FC = () => {
@@ -49,13 +51,13 @@ const App: React.FC = () => {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [cmsContent, setCmsContent] = useState<CMSAnnouncement[]>([]);
   const [currentTab, setCurrentTab] = useState<Tab>('capture');
-  
+
   // App States
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeepSearch, setIsDeepSearch] = useState(false);
   const [webInsights, setWebInsights] = useState<{ text: string; sources: WebResult[] } | null>(null);
   const [isSearchingWeb, setIsSearchingWeb] = useState(false);
-  
+
   const [filterCategory, setFilterCategory] = useState<Category | 'All'>('All');
   const [isRecording, setIsRecording] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -70,10 +72,10 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedUser = localStorage.getItem(STORAGE_KEYS.AUTH);
     if (savedUser) setCurrentUser(JSON.parse(savedUser));
-    
+
     const savedCMS = localStorage.getItem(STORAGE_KEYS.CMS);
     if (savedCMS) setCmsContent(JSON.parse(savedCMS));
-    
+
     const savedIdeas = localStorage.getItem(STORAGE_KEYS.IDEAS);
     if (savedIdeas) setIdeas(JSON.parse(savedIdeas));
   }, []);
@@ -94,7 +96,7 @@ const App: React.FC = () => {
     const updated = { ...currentUser, ...updates };
     setCurrentUser(updated);
     localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(updated));
-    
+
     const users: User[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users.map(u => u.id === updated.id ? updated : u)));
   };
@@ -136,8 +138,8 @@ const App: React.FC = () => {
     const newIdea: Idea = {
       id: Date.now().toString(),
       userId: currentUser.id,
-      content, 
-      source, 
+      content,
+      source,
       category,
       tags: Array.from(new Set([...tags, ...(aiData?.tags || [])])),
       createdAt: new Date().toISOString(),
@@ -152,7 +154,7 @@ const App: React.FC = () => {
 
   const handleDeepSearch = async () => {
     if (!searchQuery.trim() || isSearchingWeb) return;
-    
+
     // Check for Pro status
     if (currentUser?.subscriptionPlan === 'Free') {
       alert("Stealth Deep Search is a Pro feature. Please upgrade to use it!");
@@ -216,14 +218,19 @@ const App: React.FC = () => {
 
   const userIdeas = ideas.filter(i => i.userId === currentUser.id);
   const filteredIdeas = userIdeas.filter(idea => {
-    const matchesSearch = idea.content.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          idea.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = idea.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      idea.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = filterCategory === 'All' || idea.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col md:flex-row overflow-hidden">
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
+
+      {/* PWA Update Prompt */}
+      <UpdatePrompt onUpdate={() => console.log('App updating...')} />
       {/* Onboarding Tour */}
       {!currentUser.hasCompletedTour && (
         <OnboardingTour onComplete={handleTourComplete} />
@@ -247,9 +254,8 @@ const App: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setCurrentTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  currentTab === tab.id ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner' : 'text-slate-400 hover:bg-slate-800/50'
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${currentTab === tab.id ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner' : 'text-slate-400 hover:bg-slate-800/50'
+                  }`}
               >
                 {tab.icon} {tab.label}
               </button>
@@ -258,7 +264,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="mt-auto pt-6 border-t border-slate-800 flex flex-col gap-4">
-          <div 
+          <div
             onClick={() => setCurrentTab('billing')}
             className="p-4 bg-gradient-to-br from-cyan-500/10 to-violet-500/10 border border-cyan-500/20 rounded-2xl cursor-pointer hover:border-cyan-500/40 transition-all group"
           >
@@ -292,7 +298,7 @@ const App: React.FC = () => {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-4xl mx-auto w-full">
-            
+
             {/* Search Tab Content */}
             {currentTab === 'search' && (
               <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
@@ -312,15 +318,15 @@ const App: React.FC = () => {
                       <div className="p-4 text-cyan-500">
                         <Globe size={24} className={isSearchingWeb ? "animate-spin" : ""} />
                       </div>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Target keyword, concept, or domain for scraping..."
                         className="flex-1 bg-transparent border-none outline-none py-4 text-lg text-white placeholder:text-slate-700"
                         onKeyDown={(e) => e.key === 'Enter' && handleDeepSearch()}
                       />
-                      <button 
+                      <button
                         onClick={handleDeepSearch}
                         disabled={isSearchingWeb || !searchQuery.trim()}
                         className="bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest text-white shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
@@ -335,10 +341,10 @@ const App: React.FC = () => {
                 {!webInsights && !isSearchingWeb ? (
                   <div className="py-20 text-center space-y-6">
                     <div className="relative inline-block">
-                       <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center border border-slate-800 mx-auto">
-                         <Activity size={40} className="text-slate-800" />
-                       </div>
-                       <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-full animate-ping"></div>
+                      <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center border border-slate-800 mx-auto">
+                        <Activity size={40} className="text-slate-800" />
+                      </div>
+                      <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-full animate-ping"></div>
                     </div>
                     <div className="max-w-sm mx-auto">
                       <h3 className="text-lg font-bold text-slate-400">Ready for Extraction</h3>
@@ -354,7 +360,7 @@ const App: React.FC = () => {
                       <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
                         <div className="h-full bg-cyan-500 animate-[shimmer_2s_infinite] w-[40%]"></div>
                       </div>
-                      
+
                       <div className="flex justify-center gap-4">
                         {[1, 2, 3].map(i => (
                           <div key={i} className={`w-3 h-3 rounded-full bg-cyan-500 animate-bounce`} style={{ animationDelay: `${i * 0.2}s` }}></div>
@@ -365,17 +371,17 @@ const App: React.FC = () => {
                         <h4 className="text-xs font-black uppercase text-cyan-400 tracking-widest">Active Scrape Sequence</h4>
                         <div className="flex flex-wrap justify-center gap-3">
                           {['Resolving Nodes', 'Scraping Metadata', 'Analyzing Sentiment', 'Extracting Grounding Chunks'].map((task, idx) => (
-                             <div key={task} className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all duration-1000 ${idx === 0 ? 'border-cyan-500 text-cyan-400 bg-cyan-500/10' : 'border-slate-800 text-slate-600'}`}>
-                               {task}
-                             </div>
+                            <div key={task} className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all duration-1000 ${idx === 0 ? 'border-cyan-500 text-cyan-400 bg-cyan-500/10' : 'border-slate-800 text-slate-600'}`}>
+                              {task}
+                            </div>
                           ))}
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div className="h-48 bg-slate-900/30 rounded-3xl border border-slate-800 border-dashed animate-pulse"></div>
-                       <div className="h-48 bg-slate-900/30 rounded-3xl border border-slate-800 border-dashed animate-pulse"></div>
+                      <div className="h-48 bg-slate-900/30 rounded-3xl border border-slate-800 border-dashed animate-pulse"></div>
+                      <div className="h-48 bg-slate-900/30 rounded-3xl border border-slate-800 border-dashed animate-pulse"></div>
                     </div>
                   </div>
                 )}
@@ -386,13 +392,13 @@ const App: React.FC = () => {
                     <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
                       <div className="p-8 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                           <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
-                             <ShieldCheck size={20} />
-                           </div>
-                           <div>
-                             <h3 className="font-black text-sm uppercase tracking-tighter">Verified Intelligence</h3>
-                             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Confidence Score: 98.4%</p>
-                           </div>
+                          <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
+                            <ShieldCheck size={20} />
+                          </div>
+                          <div>
+                            <h3 className="font-black text-sm uppercase tracking-tighter">Verified Intelligence</h3>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Confidence Score: 98.4%</p>
+                          </div>
                         </div>
                         <button onClick={() => setWebInsights(null)} className="p-2 hover:bg-slate-800 rounded-xl text-slate-600 transition-colors">
                           <Maximize2 size={18} />
@@ -402,60 +408,60 @@ const App: React.FC = () => {
                       <div className="p-8 space-y-10">
                         {/* Executive Summary */}
                         <div className="space-y-4">
-                           <div className="flex items-center gap-2 text-cyan-400">
-                             <Info size={18} />
-                             <h4 className="text-xs font-black uppercase tracking-widest">Executive Summary</h4>
-                           </div>
-                           <p className="text-slate-300 leading-relaxed text-lg italic bg-slate-950/50 p-6 rounded-2xl border border-slate-800 shadow-inner">
-                             {webInsights.text}
-                           </p>
+                          <div className="flex items-center gap-2 text-cyan-400">
+                            <Info size={18} />
+                            <h4 className="text-xs font-black uppercase tracking-widest">Executive Summary</h4>
+                          </div>
+                          <p className="text-slate-300 leading-relaxed text-lg italic bg-slate-950/50 p-6 rounded-2xl border border-slate-800 shadow-inner">
+                            {webInsights.text}
+                          </p>
                         </div>
 
                         {/* Visual Summary Placeholder (Visuals) */}
                         <div className="space-y-4">
-                           <div className="flex items-center gap-2 text-violet-400">
-                             <ImageIcon size={18} />
-                             <h4 className="text-xs font-black uppercase tracking-widest">Visual Landscape Analysis</h4>
-                           </div>
-                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                             {[
-                               { label: 'Primary Context', color: 'from-cyan-500/20 to-violet-500/20', icon: <Layers size={24}/> },
-                               { label: 'Market Sentiment', color: 'from-violet-500/20 to-rose-500/20', icon: <Activity size={24}/> },
-                               { label: 'Related Entities', color: 'from-emerald-500/20 to-cyan-500/20', icon: <Globe size={24}/> }
-                             ].map((v, idx) => (
-                               <div key={idx} className={`p-6 rounded-3xl bg-gradient-to-br ${v.color} border border-white/5 flex flex-col items-center justify-center gap-3 text-center group hover:scale-[1.02] transition-transform cursor-default shadow-lg shadow-black/20`}>
-                                  <div className="p-4 bg-slate-950/80 rounded-2xl text-white shadow-xl group-hover:rotate-6 transition-transform">
-                                    {v.icon}
-                                  </div>
-                                  <span className="text-[10px] font-black uppercase tracking-tighter text-slate-300">{v.label}</span>
-                               </div>
-                             ))}
-                           </div>
+                          <div className="flex items-center gap-2 text-violet-400">
+                            <ImageIcon size={18} />
+                            <h4 className="text-xs font-black uppercase tracking-widest">Visual Landscape Analysis</h4>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {[
+                              { label: 'Primary Context', color: 'from-cyan-500/20 to-violet-500/20', icon: <Layers size={24} /> },
+                              { label: 'Market Sentiment', color: 'from-violet-500/20 to-rose-500/20', icon: <Activity size={24} /> },
+                              { label: 'Related Entities', color: 'from-emerald-500/20 to-cyan-500/20', icon: <Globe size={24} /> }
+                            ].map((v, idx) => (
+                              <div key={idx} className={`p-6 rounded-3xl bg-gradient-to-br ${v.color} border border-white/5 flex flex-col items-center justify-center gap-3 text-center group hover:scale-[1.02] transition-transform cursor-default shadow-lg shadow-black/20`}>
+                                <div className="p-4 bg-slate-950/80 rounded-2xl text-white shadow-xl group-hover:rotate-6 transition-transform">
+                                  {v.icon}
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-tighter text-slate-300">{v.label}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
 
                         {/* Sources */}
                         <div className="space-y-4">
-                           <div className="flex items-center gap-2 text-amber-400">
-                             <ExternalLink size={18} />
-                             <h4 className="text-xs font-black uppercase tracking-widest">Verified Sources & Grounding</h4>
-                           </div>
-                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {webInsights.sources.map((source, idx) => (
-                                <a 
-                                  key={idx} 
-                                  href={source.uri} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-cyan-500/50 hover:bg-slate-900 transition-all group shadow-sm"
-                                >
-                                   <div className="flex-1 min-w-0 pr-4">
-                                      <p className="text-xs font-bold text-slate-200 truncate">{source.title}</p>
-                                      <p className="text-[10px] text-slate-600 truncate mt-1">{source.uri}</p>
-                                   </div>
-                                   <ArrowUpRight size={16} className="text-slate-700 group-hover:text-cyan-400 transition-colors" />
-                                </a>
-                              ))}
-                           </div>
+                          <div className="flex items-center gap-2 text-amber-400">
+                            <ExternalLink size={18} />
+                            <h4 className="text-xs font-black uppercase tracking-widest">Verified Sources & Grounding</h4>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {webInsights.sources.map((source, idx) => (
+                              <a
+                                key={idx}
+                                href={source.uri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-cyan-500/50 hover:bg-slate-900 transition-all group shadow-sm"
+                              >
+                                <div className="flex-1 min-w-0 pr-4">
+                                  <p className="text-xs font-bold text-slate-200 truncate">{source.title}</p>
+                                  <p className="text-[10px] text-slate-600 truncate mt-1">{source.uri}</p>
+                                </div>
+                                <ArrowUpRight size={16} className="text-slate-700 group-hover:text-cyan-400 transition-colors" />
+                              </a>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -470,7 +476,7 @@ const App: React.FC = () => {
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform">
                   <Sparkles size={80} />
                 </div>
-                <h4 className="text-xs font-black uppercase text-violet-400 mb-2 flex items-center gap-2 tracking-widest"><Bell size={12}/> Featured Announcement</h4>
+                <h4 className="text-xs font-black uppercase text-violet-400 mb-2 flex items-center gap-2 tracking-widest"><Bell size={12} /> Featured Announcement</h4>
                 {cmsContent.filter(c => c.isActive).slice(0, 1).map(c => (
                   <div key={c.id}><h3 className="text-xl font-bold mb-1">{c.title}</h3><p className="text-sm text-slate-400 leading-relaxed">{c.text}</p></div>
                 ))}
@@ -497,11 +503,10 @@ const App: React.FC = () => {
                       <button
                         key={cat}
                         onClick={() => setSelectedCategory(cat)}
-                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 gap-2 group ${
-                          selectedCategory === cat 
-                          ? CATEGORY_COLORS[cat] + ' scale-[1.05] shadow-lg shadow-cyan-500/5'
-                          : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
-                        }`}
+                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 gap-2 group ${selectedCategory === cat
+                            ? CATEGORY_COLORS[cat] + ' scale-[1.05] shadow-lg shadow-cyan-500/5'
+                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
+                          }`}
                       >
                         <div className={`transition-transform duration-300 group-hover:scale-110`}>
                           {CATEGORY_ICONS[cat]}
@@ -516,21 +521,21 @@ const App: React.FC = () => {
                   {/* Voice Capture */}
                   <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold flex items-center gap-2 text-violet-400"><Mic size={20}/> Voice Mode</h3>
+                      <h3 className="font-bold flex items-center gap-2 text-violet-400"><Mic size={20} /> Voice Mode</h3>
                       <div className="px-2 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-[10px] font-bold text-slate-500">PCM 16k</div>
                     </div>
                     <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
                     {transcript && <div className="p-3 bg-slate-950 rounded-xl text-sm italic opacity-80 max-h-24 overflow-y-auto border border-slate-800">{transcript}</div>}
                     <div className="flex gap-2">
-                      <button 
-                        onClick={isRecording ? stopRecording : startRecording} 
+                      <button
+                        onClick={isRecording ? stopRecording : startRecording}
                         className={`flex-1 py-3 rounded-xl font-bold transition-all active:scale-[0.98] ${isRecording ? 'bg-rose-500 hover:bg-rose-600' : 'bg-violet-600 hover:bg-violet-500 shadow-lg shadow-violet-600/20'}`}
                       >
                         {isRecording ? 'Stop Recording' : 'Start Capture'}
                       </button>
                       {!isRecording && transcript && (
-                        <button 
-                          onClick={() => addIdea(transcript, 'Voice', selectedCategory, [])} 
+                        <button
+                          onClick={() => addIdea(transcript, 'Voice', selectedCategory, [])}
                           disabled={isSaving}
                           className="flex-1 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50"
                         >
@@ -542,16 +547,16 @@ const App: React.FC = () => {
 
                   {/* Typed Capture */}
                   <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                    <h3 className="font-bold flex items-center gap-2 text-cyan-400"><Keyboard size={20}/> Typed Mode</h3>
-                    <textarea 
-                      value={typedInput} 
-                      onChange={e => setTypedInput(e.target.value)} 
-                      className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500 transition-all placeholder:text-slate-700" 
+                    <h3 className="font-bold flex items-center gap-2 text-cyan-400"><Keyboard size={20} /> Typed Mode</h3>
+                    <textarea
+                      value={typedInput}
+                      onChange={e => setTypedInput(e.target.value)}
+                      className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500 transition-all placeholder:text-slate-700"
                       placeholder="Start drafting your next big thing..."
                     />
-                    <button 
-                      onClick={() => { addIdea(typedInput, 'Typed', selectedCategory, []); setTypedInput(''); }} 
-                      className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-cyan-600/20 disabled:opacity-50" 
+                    <button
+                      onClick={() => { addIdea(typedInput, 'Typed', selectedCategory, []); setTypedInput(''); }}
+                      className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-cyan-600/20 disabled:opacity-50"
                       disabled={!typedInput.trim() || isSaving}
                     >
                       {isSaving ? (
@@ -579,7 +584,7 @@ const App: React.FC = () => {
                   <div className="relative group p-1 bg-slate-800 rounded-[22px] transition-all duration-300">
                     <div className="bg-slate-950 rounded-[20px] p-2 flex items-center gap-2">
                       <SearchIcon className="ml-3 text-slate-500" size={20} />
-                      <input 
+                      <input
                         type="text"
                         placeholder="Filter local ideas or tags..."
                         value={searchQuery}
@@ -601,7 +606,7 @@ const App: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-4">
                   {filteredIdeas.length > 0 ? filteredIdeas.map(idea => (
-                    <IdeaCard key={idea.id} idea={idea} onDelete={id => setIdeas(ideas.filter(i => i.id !== id))} onToggleStar={id => setIdeas(ideas.map(i => i.id === id ? {...i, starred: !i.starred} : i))} onUpdate={(id, up) => setIdeas(ideas.map(i => i.id === id ? {...i, ...up} : i))} />
+                    <IdeaCard key={idea.id} idea={idea} onDelete={id => setIdeas(ideas.filter(i => i.id !== id))} onToggleStar={id => setIdeas(ideas.map(i => i.id === id ? { ...i, starred: !i.starred } : i))} onUpdate={(id, up) => setIdeas(ideas.map(i => i.id === id ? { ...i, ...up } : i))} />
                   )) : (
                     <div className="text-center py-20 bg-slate-900/30 rounded-3xl border border-dashed border-slate-800">
                       <p className="text-slate-600 font-medium">No ideas found matching your criteria.</p>
@@ -616,7 +621,7 @@ const App: React.FC = () => {
             )}
 
             {currentTab === 'cms' && <CMSView />}
-            
+
             {currentTab === 'users' && currentUser.isAdmin && (
               <UserManagementView currentUser={currentUser} />
             )}
