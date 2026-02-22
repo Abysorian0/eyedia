@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function enhanceIdea(content: string) {
   try {
@@ -15,8 +15,8 @@ export async function enhanceIdea(content: string) {
           type: Type.OBJECT,
           properties: {
             summary: { type: Type.STRING, description: "A concise one-sentence summary" },
-            tags: { 
-              type: Type.ARRAY, 
+            tags: {
+              type: Type.ARRAY,
               items: { type: Type.STRING },
               description: "Up to 3 relevant tags"
             }
