@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { 
-  StickyNote, 
-  CheckSquare, 
-  Lightbulb, 
-  Users, 
-  Briefcase, 
-  HelpCircle, 
+import {
+  StickyNote,
+  CheckSquare,
+  Lightbulb,
+  Users,
+  Briefcase,
+  HelpCircle,
   Search,
   PlusCircle,
   Database,
@@ -17,7 +17,9 @@ import {
   Mic,
   Keyboard,
   UserCog,
-  Smartphone
+  Smartphone,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { Category, Tab } from './types';
 
@@ -49,6 +51,7 @@ export const TABS: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: 
   { id: 'capture', label: 'Capture', icon: <PlusCircle size={20} /> },
   { id: 'bank', label: 'Bank', icon: <Database size={20} /> },
   { id: 'search', label: 'Search', icon: <Search size={20} /> },
+  { id: 'aig', label: 'AIG Intelligence', icon: <ShieldCheck size={20} /> },
   { id: 'mobile-hub', label: 'Mobile Hub', icon: <Smartphone size={20} /> },
   { id: 'stats', label: 'Stats', icon: <BarChart3 size={20} /> },
   { id: 'cms', label: 'CMS', icon: <ShieldAlert size={20} />, adminOnly: true },

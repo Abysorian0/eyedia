@@ -54,4 +54,4 @@ export interface Stats {
   today: number;
 }
 
-export type Tab = "capture" | "bank" | "search" | "stats" | "cms" | "users" | "settings" | "billing" | "mobile-hub";
+export type Tab = "capture" | "bank" | "search" | "aig" | "stats" | "cms" | "users" | "settings" | "billing" | "mobile-hub";
